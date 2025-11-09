@@ -7,25 +7,26 @@ from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 
 try:
-    import requests
+    import requests  # used if available
 except Exception:
     requests = None
 
 _logger = logging.getLogger(__name__)
 
+# --- VIN helpers (check digit) ---
 VIN_TRANS = {
     **{str(i): i for i in range(10)},
     **dict(
         A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8,
         J=1, K=2, L=3, M=4, N=5, P=7, R=9,
-        S=2, T=3, U=4, V=5, W=6, X=7, Y=8, Z=9
-    )
+        S=2, T=3, U=4, V=5, W=6, X=7, Y=8, Z=9,
+    ),
 }
 VIN_WEIGHTS = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2]
 VIN_FORBIDDEN = set("IOQ")
 
 
-def _vin_check_digit(vin):
+def _vin_check_digit(vin: str):
     total = 0
     for i, ch in enumerate(vin):
         if ch in VIN_FORBIDDEN:
@@ -44,15 +45,19 @@ class VinVehicle(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "create_date desc"
 
+    # Identity
     name = fields.Char(
         string="Reference",
         default=lambda self: self.env["ir.sequence"].next_by_code("vin.vehicle"),
-        copy=False, index=True, tracking=True
+        copy=False,
+        index=True,
+        tracking=True,
     )
     vin = fields.Char("VIN", required=True, index=True, tracking=True)
     vin_ok = fields.Boolean("VIN Check OK", compute="_compute_vin_ok", store=True)
 
-   year = fields.Char("Year", size=4, tracking=True)
+    # Basic info
+    year = fields.Char("Year", size=4, tracking=True)  # Char to avoid thousands separator
     make = fields.Char("Make", tracking=True)
     model = fields.Char("Model", tracking=True)
     trim = fields.Char("Trim")
@@ -61,42 +66,45 @@ class VinVehicle(models.Model):
     odometer = fields.Float("Odometer", help="In miles or km (specify in Notes)")
     notes = fields.Text("Notes")
 
+    # Parties / auction
     client_id = fields.Many2one("res.partner", string="Client")
     seller = fields.Char("Seller / Auction")
     lot_number = fields.Char("Auction Lot #")
 
-    title_status = fields.Selection([
-        ("clean", "Clean"),
-        ("salvage", "Salvage"),
-        ("rebuilt", "Rebuilt"),
-        ("parts", "For Parts"),
-        ("other", "Other"),
-    ], string="Title Status")
+    # Title
+    title_status = fields.Selection(
+        [
+            ("clean", "Clean"),
+            ("salvage", "Salvage"),
+            ("rebuilt", "Rebuilt"),
+            ("parts", "For Parts"),
+            ("other", "Other"),
+        ],
+        string="Title Status",
+    )
     title_province = fields.Char("Title Province/State")
     title_received = fields.Boolean("Title Received")
     title_received_date = fields.Date("Title Received On")
 
-    state = fields.Selection([
-        ("draft", "Draft"),
-        ("purchased", "Purchased"),
-        ("enroute", "En Route"),
-        ("warehouse", "At Warehouse"),
-        ("shipped", "Shipped"),
-        ("delivered", "Delivered"),
-        ("cancelled", "Cancelled"),
-    ], default="draft", tracking=True)
+    # Workflow
+    state = fields.Selection(
+        [
+            ("draft", "Draft"),
+            ("purchased", "Purchased"),
+            ("enroute", "En Route"),
+            ("warehouse", "At Warehouse"),
+            ("shipped", "Shipped"),
+            ("delivered", "Delivered"),
+            ("cancelled", "Cancelled"),
+        ],
+        default="draft",
+        tracking=True,
+    )
 
+    # Attachments stat button
     attachment_count = fields.Integer("Attachments", compute="_compute_attachment_count")
 
-    # NHTSA decode fields
-    vin_decoded_at = fields.Datetime("VIN decoded at", readonly=True)
-    vin_decoder_raw = fields.Json("VIN decoder raw response", readonly=True)
-    engine_cylinders = fields.Char("Engine Cylinders", readonly=True)
-    displacement = fields.Char("Displacement (L)", readonly=True)
-    fuel_type = fields.Char("Fuel Type", readonly=True)
-    manufacturer = fields.Char("Manufacturer", readonly=True)
-    plant_country = fields.Char("Plant Country", readonly=True)
-    # NHTSA decoder
+    # NHTSA decoder fields
     vin_decoded_at = fields.Datetime("VIN decoded at", readonly=True)
     vin_decoder_raw = fields.Json("VIN decoder raw response", readonly=True)
 
@@ -110,26 +118,19 @@ class VinVehicle(models.Model):
     manufacturer = fields.Char("Manufacturer", readonly=True)
     plant_country = fields.Char("Plant Country", readonly=True)
 
-    # Dangerous Goods flag (auto)
+    # Dangerous Goods (auto)
     is_dg = fields.Boolean(
         "Dangerous Goods",
         compute="_compute_is_dg",
         store=True,
         help="Auto-checked for EV / Hybrid / PHEV based on NHTSA fields.",
     )
-    @api.depends("electrification_level", "fuel_type", "fuel_type_secondary")
-    def _compute_is_dg(self):
-        kw = ("electric", "hybrid", "plug-in", "plug in", "phev", "ev", "bev", "hev")
-        for rec in self:
-            elec = (rec.electrification_level or "").strip().lower()
-            ft1 = (rec.fuel_type or "").strip().lower()
-            ft2 = (rec.fuel_type_secondary or "").strip().lower()
-            rec.is_dg = bool(elec) or any(k in ft1 for k in kw) or any(k in ft2 for k in kw)
 
     _sql_constraints = [
         ("vin_unique", "unique(vin)", "This VIN already exists."),
     ]
 
+    # --- Computations / constraints ---
     @api.depends("vin")
     def _compute_vin_ok(self):
         for rec in self:
@@ -157,6 +158,33 @@ class VinVehicle(models.Model):
             if check is None or check != v[8]:
                 raise ValidationError(_("Invalid VIN check digit."))
 
+    @api.constrains("year")
+    def _check_year(self):
+        for rec in self:
+            if rec.year:
+                if not re.fullmatch(r"\d{4}", rec.year):
+                    raise ValidationError(_("Year must be exactly 4 digits."))
+                if not (1950 <= int(rec.year) <= 2035):
+                    raise ValidationError(_("Year must be between 1950 and 2035."))
+
+    @api.depends()
+    def _compute_attachment_count(self):
+        for rec in self:
+            rec.attachment_count = self.env["ir.attachment"].search_count(
+                [("res_model", "=", self._name), ("res_id", "=", rec.id)]
+            )
+
+    @api.depends("electrification_level", "fuel_type", "fuel_type_secondary")
+    def _compute_is_dg(self):
+        """Mark as Dangerous Goods when any electrification present or fuel mentions."""
+        kw = ("electric", "hybrid", "plug-in", "plug in", "phev", "ev", "bev", "hev")
+        for rec in self:
+            elec = (rec.electrification_level or "").strip().lower()
+            ft1 = (rec.fuel_type or "").strip().lower()
+            ft2 = (rec.fuel_type_secondary or "").strip().lower()
+            rec.is_dg = bool(elec) or any(k in ft1 for k in kw) or any(k in ft2 for k in kw)
+
+    # --- UI helpers ---
     def action_open_attachments(self):
         self.ensure_one()
         return {
@@ -169,13 +197,7 @@ class VinVehicle(models.Model):
             "target": "current",
         }
 
-    @api.depends()
-    def _compute_attachment_count(self):
-        for rec in self:
-            rec.attachment_count = self.env["ir.attachment"].search_count(
-                [("res_model", "=", self._name), ("res_id", "=", rec.id)]
-            )
-
+    # Simple state buttons
     def action_set_state(self, new_state):
         for rec in self:
             rec.state = new_state
@@ -195,6 +217,7 @@ class VinVehicle(models.Model):
     def action_mark_delivered(self):
         self.action_set_state("delivered")
 
+    # --- VIN decoding ---
     @api.model
     def _safe_get(self, dct, key):
         v = (dct or {}).get(key)
@@ -247,13 +270,10 @@ class VinVehicle(models.Model):
         vals["plant_country"] = self._safe_get(result, "PlantCountry")
         vals["engine_cylinders"] = self._safe_get(result, "EngineCylinders")
         vals["displacement"] = self._safe_get(result, "DisplacementL")
+
         vals["fuel_type"] = self._safe_get(result, "FuelTypePrimary")
-        # NEW:
         vals["fuel_type_secondary"] = self._safe_get(result, "FuelTypeSecondary")
         vals["electrification_level"] = self._safe_get(result, "ElectrificationLevel")
-
-        vals["vin_decoder_raw"] = result
-        vals["vin_decoded_at"] = fields.Datetime.now()        
 
         vals["vin_decoder_raw"] = result
         vals["vin_decoded_at"] = fields.Datetime.now()
