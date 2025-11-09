@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Root Menu -->
+        <menuitem id="menu_vintrade_root"
+                  name="VIN Trade"
+                  web_icon="vintrade_vehicle,static/description/icon.png"
+                  sequence="10"/>
+
+        <!-- Operations Menu -->
+        <menuitem id="menu_vintrade_operations"
+                  name="Operations"
+                  parent="menu_vintrade_root"
+                  sequence="10"/>
+
+        <!-- Vehicles Menu -->
+        <menuitem id="menu_vehicle_vehicle"
+                  name="Vehicles"
+                  parent="menu_vintrade_operations"
+                  action="action_vehicle_vehicle"
+                  sequence="10"/>
+
+        <!-- Configuration Menu -->
+        <menuitem id="menu_vintrade_configuration"
+                  name="Configuration"
+                  parent="menu_vintrade_root"
+                  sequence="100"
+                  groups="group_vintrade_manager"/>
+
+    </data>
+</odoo>
