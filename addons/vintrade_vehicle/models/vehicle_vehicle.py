@@ -127,9 +127,9 @@ class VehicleVehicle(models.Model):\
         currency_field='currency_id'\
     )\
     \
-    # Links to other records\
-    sale_order_id = fields.Many2one('sale.order', string='Sales Order')\
-    invoice_ids = fields.One2many('account.move', 'vehicle_id', string='Invoices')\
+    # Links to other records
+    sale_order_id = fields.Many2one('sale.order', string='Sales Order')
+    # Note: invoice_ids removed - will be added in Phase 2 with proper setup
     \
     # Dates\
     purchase_date = fields.Date(string='Purchase Date')\
