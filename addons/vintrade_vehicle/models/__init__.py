@@ -1,1 +1,1 @@
-from . import vehicle_vehicle
+from . import vehicle

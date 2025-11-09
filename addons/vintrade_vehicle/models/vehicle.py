@@ -59,6 +59,7 @@ class VinVehicle(models.Model):
     body_type = fields.Char("Body Type")
     exterior_color = fields.Char("Color")
     odometer = fields.Float("Odometer", help="In miles or km (specify in Notes)")
+    notes = fields.Text("Notes")
 
     client_id = fields.Many2one("res.partner", string="Client")
     seller = fields.Char("Seller / Auction")
