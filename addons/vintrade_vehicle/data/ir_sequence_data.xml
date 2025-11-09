@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Sequence used by vin.vehicle 'name' default -->
+  <record id="seq_vin_vehicle" model="ir.sequence">
+    <field name="name">VIN Vehicle</field>
+    <field name="code">vin.vehicle</field>
+    <field name="prefix">V%(y)s-</field>
+    <field name="padding">5</field>
+    <!-- company_id False = global sequence -->
+    <field name="company_id" eval="False"/>
+  </record>
+</odoo>
