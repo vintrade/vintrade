@@ -55,26 +55,34 @@
     </field>
   </record>
 
-  <!-- Form -->
+  <!-- Form (Odoo 17: no attrs/states; use inline expressions) -->
   <record id="view_vin_vehicle_form" model="ir.ui.view">
     <field name="name">vin.vehicle.form</field>
     <field name="model">vin.vehicle</field>
     <field name="arch" type="xml">
       <form string="Vehicle">
         <header>
-          <button name="action_mark_purchased" type="object" string="Purchased" states="draft" class="btn-primary"/>
-          <button name="action_mark_enroute" type="object" string="En Route" states="purchased"/>
-          <button name="action_mark_warehouse" type="object" string="At Warehouse" states="enroute"/>
-          <button name="action_mark_shipped" type="object" string="Shipped" states="warehouse"/>
-          <button name="action_mark_delivered" type="object" string="Delivered" states="shipped"/>
-          <field name="state" widget="statusbar" statusbar_visible="draft,purchased,enroute,warehouse,shipped,delivered,cancelled"/>
+          <button name="action_mark_purchased" type="object" string="Purchased" class="btn-primary"
+                  invisible="state != 'draft'"/>
+          <button name="action_mark_enroute" type="object" string="En Route"
+                  invisible="state != 'purchased'"/>
+          <button name="action_mark_warehouse" type="object" string="At Warehouse"
+                  invisible="state != 'enroute'"/>
+          <button name="action_mark_shipped" type="object" string="Shipped"
+                  invisible="state != 'warehouse'"/>
+          <button name="action_mark_delivered" type="object" string="Delivered"
+                  invisible="state != 'shipped'"/>
+          <field name="state" widget="statusbar"
+                 statusbar_visible="draft,purchased,enroute,warehouse,shipped,delivered,cancelled"/>
         </header>
+
         <sheet>
           <div class="oe_button_box" name="button_box">
             <button class="oe_stat_button" type="object" name="action_open_attachments" icon="fa-paperclip">
               <field name="attachment_count" widget="statinfo" string="Documents"/>
             </button>
           </div>
+
           <group>
             <group>
               <field name="name" readonly="1"/>
@@ -95,9 +103,10 @@
               <field name="title_status"/>
               <field name="title_province"/>
               <field name="title_received"/>
-              <field name="title_received_date" attrs="{'invisible':[('title_received','=',False)]}"/>
+              <field name="title_received_date" invisible="not title_received"/>
             </group>
           </group>
+
           <notebook>
             <page string="Notes">
               <field name="notes"/>
