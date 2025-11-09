@@ -1,1 +1,0 @@
-from . import vehicle_vehicle
