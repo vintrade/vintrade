@@ -55,13 +55,15 @@
     </field>
   </record>
 
-  <!-- Form (Odoo 17: use inline invisibility, no attrs/states) -->
+  <!-- Form (Odoo 17: inline invisibility, no attrs/states) -->
   <record id="view_vin_vehicle_form" model="ir.ui.view">
     <field name="name">vin.vehicle.form</field>
     <field name="model">vin.vehicle</field>
     <field name="arch" type="xml">
       <form string="Vehicle">
         <header>
+          <button name="action_decode_vin" type="object" string="Decode VIN" class="btn-secondary"
+                  invisible="not vin"/>
           <button name="action_mark_purchased" type="object" string="Purchased" class="btn-primary"
                   invisible="state != 'draft'"/>
           <button name="action_mark_enroute" type="object" string="En Route"
@@ -104,6 +106,11 @@
               <field name="title_province"/>
               <field name="title_received"/>
               <field name="title_received_date" invisible="not title_received"/>
+              <field name="manufacturer" readonly="1"/>
+              <field name="plant_country" readonly="1"/>
+              <field name="engine_cylinders" readonly="1"/>
+              <field name="displacement" readonly="1"/>
+              <field name="fuel_type" readonly="1"/>
             </group>
           </group>
 
@@ -111,7 +118,10 @@
             <page string="Notes">
               <field name="notes"/>
             </page>
-            <!-- Odoo 17: prefer the chatter component -->
+            <page string="Decoder">
+              <field name="vin_decoder_raw" widget="json" readonly="1"/>
+              <field name="vin_decoded_at" readonly="1"/>
+            </page>
             <page string="Chatter">
               <chatter/>
             </page>
