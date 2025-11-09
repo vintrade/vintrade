@@ -112,7 +112,6 @@
               <field name="engine_cylinders" readonly="1"/>
               <field name="displacement" readonly="1"/>
               <field name="fuel_type" readonly="1"/>
-              <field name="fuel_type" readonly="1"/>
               <field name="fuel_type_secondary" readonly="1"/>
               <field name="electrification_level" readonly="1"/>
               <field name="is_dg" readonly="1"/>

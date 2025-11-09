@@ -57,7 +57,7 @@ class VinVehicle(models.Model):
     vin_ok = fields.Boolean("VIN Check OK", compute="_compute_vin_ok", store=True)
 
     # Basic info
-    year = fields.Char("Year", size=4, tracking=True)  # Char to avoid thousands separator
+    year = fields.Char("Year", size=4, tracking=True)  # Char to avoid 2,017 formatting
     make = fields.Char("Make", tracking=True)
     model = fields.Char("Model", tracking=True)
     trim = fields.Char("Trim")
@@ -217,7 +217,7 @@ class VinVehicle(models.Model):
     def action_mark_delivered(self):
         self.action_set_state("delivered")
 
-    # --- VIN decoding ---
+    # --- VIN decoding helpers ---
     @api.model
     def _safe_get(self, dct, key):
         v = (dct or {}).get(key)
@@ -248,16 +248,8 @@ class VinVehicle(models.Model):
             raise UserError(_("No decode results returned for VIN %s") % vin)
         return results[0]
 
-    def action_decode_vin(self):
-        self.ensure_one()
-        try:
-            result = self._nhtsa_decode(self.vin)
-        except UserError:
-            raise
-        except Exception as e:
-            _logger.exception("VIN decode unexpected error")
-            raise UserError(_("VIN decode failed: %s") % e)
-
+    def _vals_from_nhtsa(self, result):
+        """Build a values dict from an NHTSA result row."""
         vals = {}
         vals["make"] = self._safe_get(result, "Make") or vals.get("make")
         vals["model"] = self._safe_get(result, "Model") or vals.get("model")
@@ -270,14 +262,26 @@ class VinVehicle(models.Model):
         vals["plant_country"] = self._safe_get(result, "PlantCountry")
         vals["engine_cylinders"] = self._safe_get(result, "EngineCylinders")
         vals["displacement"] = self._safe_get(result, "DisplacementL")
-
         vals["fuel_type"] = self._safe_get(result, "FuelTypePrimary")
         vals["fuel_type_secondary"] = self._safe_get(result, "FuelTypeSecondary")
         vals["electrification_level"] = self._safe_get(result, "ElectrificationLevel")
 
         vals["vin_decoder_raw"] = result
         vals["vin_decoded_at"] = fields.Datetime.now()
+        return vals
 
+    # --- Button (manual refresh) ---
+    def action_decode_vin(self):
+        self.ensure_one()
+        try:
+            result = self._nhtsa_decode(self.vin)
+        except UserError:
+            raise
+        except Exception as e:
+            _logger.exception("VIN decode unexpected error")
+            raise UserError(_("VIN decode failed: %s") % e)
+
+        vals = self._vals_from_nhtsa(result)
         self.write(vals)
         return {
             "type": "ir.actions.client",
@@ -289,3 +293,57 @@ class VinVehicle(models.Model):
                 "sticky": False,
             },
         }
+
+    # --- Auto-decode on form change / create / VIN change ---
+    @api.onchange("vin")
+    def _onchange_vin_autodecode(self):
+        if not self.vin:
+            return
+        v = self.vin.strip().upper()
+        if len(v) != 17:
+            return
+        check = _vin_check_digit(v)
+        if check is None or check != v[8]:
+            return
+        try:
+            result = self._nhtsa_decode(v)
+            vals = self._vals_from_nhtsa(result)
+            for k, val in vals.items():
+                setattr(self, k, val)
+        except Exception:
+            # Onchange should never raise; just log.
+            _logger.exception("Onchange VIN autodecode failed for %s", v)
+            return
+
+    @api.model
+    def create(self, vals):
+        rec = super().create(vals)
+        vin = vals.get("vin")
+        if vin and len(vin.strip()) == 17:
+            v = vin.strip().upper()
+            if _vin_check_digit(v) == v[8]:
+                try:
+                    result = rec._nhtsa_decode(v)
+                    vals2 = rec._vals_from_nhtsa(result)
+                    # bypass our write() override to avoid recursion
+                    super(VinVehicle, rec.with_context(skip_autodecode=True)).write(vals2)
+                except Exception:
+                    _logger.exception("Auto-decode on create failed for %s", vin)
+        return rec
+
+    def write(self, vals):
+        res = super().write(vals)
+        if "vin" in vals and not self.env.context.get("skip_autodecode"):
+            for rec in self:
+                vin = rec.vin and rec.vin.strip()
+                if vin and len(vin) == 17:
+                    v = vin.upper()
+                    if _vin_check_digit(v) == v[8]:
+                        try:
+                            result = rec._nhtsa_decode(v)
+                            vals2 = rec._vals_from_nhtsa(result)
+                            # bypass our own write again
+                            super(VinVehicle, rec.with_context(skip_autodecode=True)).write(vals2)
+                        except Exception:
+                            _logger.exception("Auto-decode on write failed for %s", vin)
+        return res
