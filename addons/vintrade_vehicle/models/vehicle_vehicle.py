@@ -6,15 +6,13 @@ import re
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 
-# Try requests first (nice timeouts/errors); fall back to stdlib if unavailable
 try:
     import requests
-except Exception:  # pragma: no cover
+except Exception:
     requests = None
 
 _logger = logging.getLogger(__name__)
 
-# --- VIN validation helpers (ISO 3779 check digit) ---
 VIN_TRANS = {
     **{str(i): i for i in range(10)},
     **dict(
@@ -28,7 +26,6 @@ VIN_FORBIDDEN = set("IOQ")
 
 
 def _vin_check_digit(vin):
-    """Return expected check digit character for a 17-char VIN (uppercased)."""
     total = 0
     for i, ch in enumerate(vin):
         if ch in VIN_FORBIDDEN:
@@ -47,7 +44,6 @@ class VinVehicle(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "create_date desc"
 
-    # --- Identity / base fields ---
     name = fields.Char(
         string="Reference",
         default=lambda self: self.env["ir.sequence"].next_by_code("vin.vehicle"),
@@ -68,7 +64,6 @@ class VinVehicle(models.Model):
     seller = fields.Char("Seller / Auction")
     lot_number = fields.Char("Auction Lot #")
 
-    # --- Title / ownership ---
     title_status = fields.Selection([
         ("clean", "Clean"),
         ("salvage", "Salvage"),
@@ -80,7 +75,6 @@ class VinVehicle(models.Model):
     title_received = fields.Boolean("Title Received")
     title_received_date = fields.Date("Title Received On")
 
-    # --- Workflow / state ---
     state = fields.Selection([
         ("draft", "Draft"),
         ("purchased", "Purchased"),
@@ -91,10 +85,9 @@ class VinVehicle(models.Model):
         ("cancelled", "Cancelled"),
     ], default="draft", tracking=True)
 
-    # --- Attachments ---
     attachment_count = fields.Integer("Attachments", compute="_compute_attachment_count")
 
-    # --- NHTSA decode fields ---
+    # NHTSA decode fields
     vin_decoded_at = fields.Datetime("VIN decoded at", readonly=True)
     vin_decoder_raw = fields.Json("VIN decoder raw response", readonly=True)
     engine_cylinders = fields.Char("Engine Cylinders", readonly=True)
@@ -107,7 +100,6 @@ class VinVehicle(models.Model):
         ("vin_unique", "unique(vin)", "This VIN already exists."),
     ]
 
-    # ----- Computations & constraints -----
     @api.depends("vin")
     def _compute_vin_ok(self):
         for rec in self:
@@ -154,7 +146,6 @@ class VinVehicle(models.Model):
                 [("res_model", "=", self._name), ("res_id", "=", rec.id)]
             )
 
-    # ----- Simple state transitions -----
     def action_set_state(self, new_state):
         for rec in self:
             rec.state = new_state
@@ -174,29 +165,22 @@ class VinVehicle(models.Model):
     def action_mark_delivered(self):
         self.action_set_state("delivered")
 
-    # ----- Helpers for decoder -----
     @api.model
     def _safe_get(self, dct, key):
         v = (dct or {}).get(key)
         return v if v not in (None, "", "0") else False
 
     def _nhtsa_decode(self, vin):
-        """
-        Call NHTSA VPIC API to decode VIN. Return first result dict or raise.
-        API: https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/<VIN>?format=json
-        """
         if not vin:
             raise UserError(_("VIN is empty"))
         vin = vin.strip().upper()
         url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/{vin}?format=json"
-
         try:
             if requests:
                 resp = requests.get(url, timeout=10)
                 resp.raise_for_status()
                 data = resp.json()
             else:
-                # stdlib fallback
                 from urllib.request import urlopen
                 import ssl
                 ctx = ssl.create_default_context()
@@ -212,20 +196,18 @@ class VinVehicle(models.Model):
         return results[0]
 
     def action_decode_vin(self):
-        """Decode VIN via NHTSA and populate key fields; store raw JSON."""
         self.ensure_one()
         try:
             result = self._nhtsa_decode(self.vin)
         except UserError:
             raise
-        except Exception as e:  # pragma: no cover
+        except Exception as e:
             _logger.exception("VIN decode unexpected error")
             raise UserError(_("VIN decode failed: %s") % e)
 
         vals = {}
         vals["make"] = self._safe_get(result, "Make") or vals.get("make")
         vals["model"] = self._safe_get(result, "Model") or vals.get("model")
-
         year = self._safe_get(result, "ModelYear")
         if year:
             try:

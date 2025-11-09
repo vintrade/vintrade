@@ -22,12 +22,11 @@
         'stock',
         'contacts',
     ],
-    'data': [
-        'security/vehicle_security.xml',
-        'security/ir.model.access.csv',
-        'data/vehicle_data.xml',
-        'views/vehicle_vehicle_views.xml',
-        'views/vehicle_menus.xml',
+    "data": [
+        "data/ir_sequence_data.xml",
+        "security/ir.model.access.csv",
+        "views/vehicle_views.xml",
+    ],
     ],
     'demo': [],
     'installable': True,
