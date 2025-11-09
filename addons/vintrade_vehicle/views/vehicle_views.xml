@@ -31,6 +31,7 @@
         <filter string="Warehouse" name="warehouse" domain="[('state','=','warehouse')]"/>
         <filter string="Shipped" name="shipped" domain="[('state','=','shipped')]"/>
         <filter string="Delivered" name="delivered" domain="[('state','=','delivered')]"/>
+        <filter string="DG" name="dg" domain="[('is_dg','=',True)]"/>
       </search>
     </field>
   </record>
@@ -111,6 +112,10 @@
               <field name="engine_cylinders" readonly="1"/>
               <field name="displacement" readonly="1"/>
               <field name="fuel_type" readonly="1"/>
+              <field name="fuel_type" readonly="1"/>
+              <field name="fuel_type_secondary" readonly="1"/>
+              <field name="electrification_level" readonly="1"/>
+              <field name="is_dg" readonly="1"/>
             </group>
           </group>
 

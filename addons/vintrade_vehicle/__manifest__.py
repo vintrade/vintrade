@@ -1,7 +1,7 @@
 {
     "name": "VIN Trade • Vehicles",
     "summary": "Core vehicle model (VIN-first) for VIN Trade operations",
-    "version": "17.0.1.0.1",  # incremented version for rebuild
+    "version": "17.0.1.0.3",
     "author": "VIN Trade Inc.",
     "website": "",
     "category": "Operations/Inventory",
