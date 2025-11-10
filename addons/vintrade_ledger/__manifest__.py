@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "VIN Trade • Customer Ledger",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.0.1",
     "summary": "Customer credit limit, wallet balance, statements, and invoice guard",
     "author": "VIN Trade Inc.",
     "website": "",
