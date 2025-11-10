@@ -119,6 +119,10 @@ class VinVehicle(models.Model):
     warranty_cancelled = fields.Boolean("Warranty Cancelled")
     carfax_declaration = fields.Text("Carfax Declaration")
 
+
+    # General internal notes (used by the Notes tab in the form)
+    notes = fields.Text("Notes")
+
     # Repair estimate
     repair_estimate = fields.Monetary("Repair Estimate ($)", currency_field="currency_id", default=0.0)
 
