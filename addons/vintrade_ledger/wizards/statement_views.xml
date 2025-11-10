@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_statement_wizard" model="ir.ui.view">
+    <field name="name">vin.statement.wizard.form</field>
+    <field name="model">vin.statement.wizard</field>
+    <field name="arch" type="xml">
+      <form string="Customer Statement">
+        <group>
+          <field name="partner_id" options="{'no_open': True}"/>
+          <field name="company_id" options="{'no_open': True}"/>
+          <field name="date_to"/>
+          <field name="include_all"/>
+        </group>
+        <footer>
+          <button name="action_print" type="object" string="Print" class="btn-primary"/>
+          <button string="Cancel" class="btn-secondary" special="cancel"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+</odoo>

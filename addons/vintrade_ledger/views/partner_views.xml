@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_partner_form_ledger" model="ir.ui.view">
+    <field name="name">res.partner.form.vin.ledger</field>
+    <field name="model">res.partner</field>
+    <field name="inherit_id" ref="base.view_partner_form"/>
+    <field name="arch" type="xml">
+      <sheet position="inside">
+        <div class="oe_button_box" name="button_box">
+          <button name="action_open_wallet" type="object" class="oe_stat_button" icon="fa-briefcase">
+            <field name="wallet_move_count" widget="statinfo" string="Wallet"/>
+          </button>
+          <button name="action_open_statement_wizard" type="object" class="oe_stat_button" icon="fa-file-pdf-o"
+                  help="Generate customer statement"/>
+        </div>
+      </sheet>
+
+      <notebook position="inside">
+        <page string="Credit">
+          <group>
+            <group>
+              <field name="credit_limit"/>
+              <field name="on_hold"/>
+            </group>
+            <group>
+              <field name="wallet_balance" readonly="1"/>
+            </group>
+          </group>
+        </page>
+      </notebook>
+    </field>
+  </record>
+</odoo>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <report
+      id="report_customer_statement"
+      model="vin.statement.wizard"
+      string="Customer Statement"
+      report_type="qweb-pdf"
+      name="vintrade_ledger.customer_statement"
+      file="vintrade_ledger.customer_statement"
+  />
+  <template id="customer_statement">
+    <t t-call="web.external_layout">
+      <t t-set="o" t-value="doc"/>
+      <div class="page">
+        <h2>Customer Statement</h2>
+        <p>
+          <strong t-esc="o.partner_id.display_name"/> — <span t-esc="o.company_id.display_name"/>
+        </p>
+        <p>
+          As of: <span t-esc="o.date_to"/>
+        </p>
+
+        <t t-set="lines" t-value="
+          env['account.move.line'].search([
+            ('partner_id','=',o.partner_id.id),
+            ('company_id','=',o.company_id.id),
+            ('account_id.account_type','=','asset_receivable'),
+            ('date','&lt;=', o.date_to),
+            ('parent_state','!=','cancel'),
+            ]).sorted(lambda l: (l.date, l.id))
+        "/>
+
+        <table class="table table-sm o_main_table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Document</th>
+              <th class="text-end">Debit</th>
+              <th class="text-end">Credit</th>
+              <th class="text-end">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <t t-set="running" t-value="0.0"/>
+            <t t-foreach="lines" t-as="l">
+              <t t-set="running" t-value="running + l.balance"/>
+              <tr>
+                <td t-esc="l.date"/>
+                <td>
+                  <span t-esc="l.move_name or l.move_id.name"/>
+                </td>
+                <td class="text-end">
+                  <span t-esc="format_amount(l.debit, o.company_id.currency_id)"/>
+                </td>
+                <td class="text-end">
+                  <span t-esc="format_amount(l.credit, o.company_id.currency_id)"/>
+                </td>
+                <td class="text-end">
+                  <span t-esc="format_amount(running, o.company_id.currency_id)"/>
+                </td>
+              </tr>
+            </t>
+          </tbody>
+        </table>
+
+        <div class="mt16 text-end">
+          <strong>Total balance: </strong>
+          <span t-esc="format_amount(sum(lines.mapped('balance')), o.company_id.currency_id)"/>
+        </div>
+      </div>
+    </t>
+  </template>
+</odoo>
