@@ -5,11 +5,6 @@
     <field name="name">Vehicles</field>
     <field name="res_model">vin.vehicle</field>
     <field name="view_mode">tree,form,kanban,search</field>
-    <field name="help" type="html">
-      <p class="o_view_nocontent_smiling_face">
-        Create your first vehicle to get started.
-      </p>
-    </field>
   </record>
 
   <menuitem id="menu_vin_root" name="VIN Trade" sequence="10"/>
@@ -26,12 +21,8 @@
         <field name="make"/>
         <field name="model"/>
         <filter string="Valid VIN" name="vin_ok" domain="[('vin_ok','=',True)]"/>
-        <filter string="Purchased" name="purchased" domain="[('state','=','purchased')]"/>
-        <filter string="En Route" name="enroute" domain="[('state','=','enroute')]"/>
-        <filter string="Warehouse" name="warehouse" domain="[('state','=','warehouse')]"/>
-        <filter string="Shipped" name="shipped" domain="[('state','=','shipped')]"/>
-        <filter string="Delivered" name="delivered" domain="[('state','=','delivered')]"/>
         <filter string="DG" name="dg" domain="[('is_dg','=',True)]"/>
+        <filter string="Total Loss" name="totloss" domain="[('total_loss','=',True)]"/>
       </search>
     </field>
   </record>
@@ -48,15 +39,24 @@
         <field name="year"/>
         <field name="make"/>
         <field name="model"/>
-        <field name="client_id"/>
-        <field name="seller"/>
-        <field name="lot_number"/>
+        <field name="exterior_color"/>
+        <field name="distance_travelled"/>
+        <field name="distance_uom"/>
+        <field name="purchase_date"/>
+        <field name="purchase_price"/>
+        <field name="total_cost"/>
+        <field name="expected_sale_price"/>
+        <field name="sale_price"/>
+        <field name="repair_estimate"/>
+        <field name="profit"/>
+        <field name="is_dg"/>
+        <field name="total_loss"/>
         <field name="state"/>
       </tree>
     </field>
   </record>
 
-  <!-- Form (Odoo 17: inline invisibility, no attrs/states) -->
+  <!-- Form -->
   <record id="view_vin_vehicle_form" model="ir.ui.view">
     <field name="name">vin.vehicle.form</field>
     <field name="model">vin.vehicle</field>
@@ -84,6 +84,9 @@
             <button class="oe_stat_button" type="object" name="action_open_attachments" icon="fa-paperclip">
               <field name="attachment_count" widget="statinfo" string="Documents"/>
             </button>
+            <button class="oe_stat_button" type="object" name="action_create_vendor_bill" icon="fa-file-text-o">
+              <field name="vendor_bill_id" string="Vendor Bill" widget="statinfo"/>
+            </button>
           </div>
 
           <group>
@@ -97,24 +100,61 @@
               <field name="trim"/>
               <field name="body_type"/>
               <field name="exterior_color"/>
-              <field name="odometer"/>
             </group>
             <group>
-              <field name="client_id"/>
-              <field name="seller"/>
-              <field name="lot_number"/>
-              <field name="title_status"/>
-              <field name="title_province"/>
-              <field name="title_received"/>
-              <field name="title_received_date" invisible="not title_received"/>
+              <field name="distance_travelled"/>
+              <field name="distance_uom" widget="radio"/>
+              <field name="branding"/>
+              <field name="declaration"/>
+              <field name="carfax_declaration"/>
+            </group>
+          </group>
+
+          <group string="NHTSA / Specs">
+            <group>
               <field name="manufacturer" readonly="1"/>
               <field name="plant_country" readonly="1"/>
               <field name="engine_cylinders" readonly="1"/>
               <field name="displacement" readonly="1"/>
+            </group>
+            <group>
               <field name="fuel_type" readonly="1"/>
               <field name="fuel_type_secondary" readonly="1"/>
               <field name="electrification_level" readonly="1"/>
               <field name="is_dg" readonly="1"/>
+            </group>
+          </group>
+
+          <group string="Purchase">
+            <group>
+              <field name="purchase_date"/>
+              <field name="seller_partner_id" context="{'default_is_company': True}"/>
+              <field name="seller"/>
+              <field name="lot_number"/>
+            </group>
+            <group>
+              <field name="currency_id"/>
+              <field name="purchase_price"/>
+              <field name="auction_fees"/>
+              <field name="other_fees"/>
+              <field name="total_cost" readonly="1"/>
+              <field name="create_vendor_bill_on_save"/>
+              <field name="vendor_bill_id" readonly="1"/>
+            </group>
+          </group>
+
+          <group string="Commercial">
+            <group>
+              <field name="expected_sale_price"/>
+              <field name="sale_price"/>
+              <field name="repair_estimate"/>
+              <field name="profit" readonly="1"/>
+            </group>
+            <group>
+              <label string="Vehicle has been declared a total loss by the insurer" invisible="not total_loss"/>
+              <field name="total_loss"/>
+              <label string="The manufacturer’s warranty has been cancelled" invisible="not warranty_cancelled"/>
+              <field name="warranty_cancelled"/>
             </group>
           </group>
 

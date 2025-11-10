@@ -45,6 +45,22 @@ class VinVehicle(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "create_date desc"
 
+    # Company / currency
+    company_id = fields.Many2one(
+        "res.company",
+        string="Company",
+        required=True,
+        default=lambda self: self.env.company.id,
+        index=True,
+    )
+    currency_id = fields.Many2one(
+        "res.currency",
+        string="Currency",
+        required=True,
+        default=lambda self: self.env.company.currency_id.id,
+        help="Currency for purchase and fee amounts.",
+    )
+
     # Identity
     name = fields.Char(
         string="Reference",
@@ -62,29 +78,82 @@ class VinVehicle(models.Model):
     model = fields.Char("Model", tracking=True)
     trim = fields.Char("Trim")
     body_type = fields.Char("Body Type")
-    exterior_color = fields.Char("Color")
-    odometer = fields.Float("Odometer", help="In miles or km (specify in Notes)")
-    notes = fields.Text("Notes")
 
-    # Parties / auction
-    client_id = fields.Many2one("res.partner", string="Client")
-    seller = fields.Char("Seller / Auction")
-    lot_number = fields.Char("Auction Lot #")
-
-    # Title
-    title_status = fields.Selection(
-        [
-            ("clean", "Clean"),
-            ("salvage", "Salvage"),
-            ("rebuilt", "Rebuilt"),
-            ("parts", "For Parts"),
+    # Color as dropdown
+    exterior_color = fields.Selection(
+        selection=[
+            ("black", "Black"),
+            ("white", "White"),
+            ("gray", "Gray"),
+            ("silver", "Silver"),
+            ("blue", "Blue"),
+            ("red", "Red"),
+            ("green", "Green"),
+            ("brown", "Brown"),
+            ("beige", "Beige"),
+            ("yellow", "Yellow"),
+            ("orange", "Orange"),
+            ("purple", "Purple"),
+            ("gold", "Gold"),
             ("other", "Other"),
         ],
-        string="Title Status",
+        string="Color",
+        tracking=True,
     )
-    title_province = fields.Char("Title Province/State")
-    title_received = fields.Boolean("Title Received")
-    title_received_date = fields.Date("Title Received On")
+
+    # Distance travelled + unit
+    distance_travelled = fields.Float("Distance Travelled")
+    distance_uom = fields.Selection(
+        [("km", "KM"), ("mi", "MI")],
+        string="Unit",
+        default="km",
+        required=True,
+    )
+
+    # Branding (ownership type)
+    branding = fields.Char("Branding / Ownership Type")
+
+    # Declarations & conditions
+    declaration = fields.Text("Declaration")
+    total_loss = fields.Boolean("Total Loss")
+    warranty_cancelled = fields.Boolean("Warranty Cancelled")
+    carfax_declaration = fields.Text("Carfax Declaration")
+
+    # Repair estimate
+    repair_estimate = fields.Monetary("Repair Estimate ($)", currency_field="currency_id", default=0.0)
+
+    # Purchase section
+    purchase_date = fields.Date("Purchase Date", tracking=True)
+    seller_partner_id = fields.Many2one("res.partner", string="Seller / Counterparty")
+    seller = fields.Char("Seller (Text)")
+    lot_number = fields.Char("Auction Lot #")
+    purchase_price = fields.Monetary("Purchase Price", currency_field="currency_id", default=0.0)
+    auction_fees = fields.Monetary("Auction Fees", currency_field="currency_id", default=0.0)
+    other_fees = fields.Monetary("Other Fees", currency_field="currency_id", default=0.0)
+
+    total_cost = fields.Monetary(
+        "Total Cost",
+        currency_field="currency_id",
+        compute="_compute_total_cost",
+        store=True,
+        help="Sum of price + auction fees + other fees.",
+    )
+
+    # Commercial
+    expected_sale_price = fields.Monetary(
+        "Expected Sale Price", currency_field="currency_id", tracking=True
+    )
+    sale_price = fields.Monetary(
+        "Sale Price (Actual)", currency_field="currency_id",
+        help="Set when the vehicle is sold/invoiced if you want profit to use the actual number."
+    )
+    profit = fields.Monetary(
+        "Profit",
+        currency_field="currency_id",
+        compute="_compute_profit",
+        store=True,
+        help="(Sale Price or Expected Sale Price) − Total Cost − Repair Estimate.",
+    )
 
     # Workflow
     state = fields.Selection(
@@ -107,23 +176,25 @@ class VinVehicle(models.Model):
     # NHTSA decoder fields
     vin_decoded_at = fields.Datetime("VIN decoded at", readonly=True)
     vin_decoder_raw = fields.Json("VIN decoder raw response", readonly=True)
-
     engine_cylinders = fields.Char("Engine Cylinders", readonly=True)
     displacement = fields.Char("Displacement (L)", readonly=True)
-
     fuel_type = fields.Char("Fuel Type (Primary)", readonly=True)
     fuel_type_secondary = fields.Char("Fuel Type (Secondary)", readonly=True)
     electrification_level = fields.Char("Electrification Level", readonly=True)
-
     manufacturer = fields.Char("Manufacturer", readonly=True)
     plant_country = fields.Char("Plant Country", readonly=True)
-
-    # Dangerous Goods (auto)
     is_dg = fields.Boolean(
         "Dangerous Goods",
         compute="_compute_is_dg",
         store=True,
         help="Auto-checked for EV / Hybrid / PHEV based on NHTSA fields.",
+    )
+
+    # Vendor bill linkage
+    vendor_bill_id = fields.Many2one("account.move", string="Vendor Bill", readonly=True)
+    create_vendor_bill_on_save = fields.Boolean(
+        "Auto-create Vendor Bill",
+        help="If enabled, a draft vendor bill is created on save using purchase amounts."
     )
 
     _sql_constraints = [
@@ -167,16 +238,19 @@ class VinVehicle(models.Model):
                 if not (1950 <= int(rec.year) <= 2035):
                     raise ValidationError(_("Year must be between 1950 and 2035."))
 
-    @api.depends()
-    def _compute_attachment_count(self):
+    @api.depends("purchase_price", "auction_fees", "other_fees")
+    def _compute_total_cost(self):
         for rec in self:
-            rec.attachment_count = self.env["ir.attachment"].search_count(
-                [("res_model", "=", self._name), ("res_id", "=", rec.id)]
-            )
+            rec.total_cost = (rec.purchase_price or 0.0) + (rec.auction_fees or 0.0) + (rec.other_fees or 0.0)
+
+    @api.depends("sale_price", "expected_sale_price", "total_cost", "repair_estimate")
+    def _compute_profit(self):
+        for rec in self:
+            sale = rec.sale_price if rec.sale_price not in (None, 0.0) else (rec.expected_sale_price or 0.0)
+            rec.profit = sale - (rec.total_cost or 0.0) - (rec.repair_estimate or 0.0)
 
     @api.depends("electrification_level", "fuel_type", "fuel_type_secondary")
     def _compute_is_dg(self):
-        """Mark as Dangerous Goods when any electrification present or fuel mentions."""
         kw = ("electric", "hybrid", "plug-in", "plug in", "phev", "ev", "bev", "hev")
         for rec in self:
             elec = (rec.electrification_level or "").strip().lower()
@@ -184,7 +258,14 @@ class VinVehicle(models.Model):
             ft2 = (rec.fuel_type_secondary or "").strip().lower()
             rec.is_dg = bool(elec) or any(k in ft1 for k in kw) or any(k in ft2 for k in kw)
 
-    # --- UI helpers ---
+    @api.depends()
+    def _compute_attachment_count(self):
+        for rec in self:
+            rec.attachment_count = self.env["ir.attachment"].search_count(
+                [("res_model", "=", self._name), ("res_id", "=", rec.id)]
+            )
+
+    # --- UI helpers & state buttons ---
     def action_open_attachments(self):
         self.ensure_one()
         return {
@@ -197,27 +278,17 @@ class VinVehicle(models.Model):
             "target": "current",
         }
 
-    # Simple state buttons
     def action_set_state(self, new_state):
         for rec in self:
             rec.state = new_state
 
-    def action_mark_purchased(self):
-        self.action_set_state("purchased")
+    def action_mark_purchased(self): self.action_set_state("purchased")
+    def action_mark_enroute(self): self.action_set_state("enroute")
+    def action_mark_warehouse(self): self.action_set_state("warehouse")
+    def action_mark_shipped(self): self.action_set_state("shipped")
+    def action_mark_delivered(self): self.action_set_state("delivered")
 
-    def action_mark_enroute(self):
-        self.action_set_state("enroute")
-
-    def action_mark_warehouse(self):
-        self.action_set_state("warehouse")
-
-    def action_mark_shipped(self):
-        self.action_set_state("shipped")
-
-    def action_mark_delivered(self):
-        self.action_set_state("delivered")
-
-    # --- VIN decoding helpers ---
+    # --- NHTSA decoding ---
     @api.model
     def _safe_get(self, dct, key):
         v = (dct or {}).get(key)
@@ -249,14 +320,12 @@ class VinVehicle(models.Model):
         return results[0]
 
     def _vals_from_nhtsa(self, result):
-        """Build a values dict from an NHTSA result row."""
         vals = {}
         vals["make"] = self._safe_get(result, "Make") or vals.get("make")
         vals["model"] = self._safe_get(result, "Model") or vals.get("model")
         year = self._safe_get(result, "ModelYear")
         if year:
             vals["year"] = str(year)
-
         vals["body_type"] = self._safe_get(result, "BodyClass")
         vals["manufacturer"] = self._safe_get(result, "Manufacturer")
         vals["plant_country"] = self._safe_get(result, "PlantCountry")
@@ -265,12 +334,10 @@ class VinVehicle(models.Model):
         vals["fuel_type"] = self._safe_get(result, "FuelTypePrimary")
         vals["fuel_type_secondary"] = self._safe_get(result, "FuelTypeSecondary")
         vals["electrification_level"] = self._safe_get(result, "ElectrificationLevel")
-
         vals["vin_decoder_raw"] = result
         vals["vin_decoded_at"] = fields.Datetime.now()
         return vals
 
-    # --- Button (manual refresh) ---
     def action_decode_vin(self):
         self.ensure_one()
         try:
@@ -294,7 +361,7 @@ class VinVehicle(models.Model):
             },
         }
 
-    # --- Auto-decode on form change / create / VIN change ---
+    # Auto-decode on form change / create / VIN change
     @api.onchange("vin")
     def _onchange_vin_autodecode(self):
         if not self.vin:
@@ -311,13 +378,21 @@ class VinVehicle(models.Model):
             for k, val in vals.items():
                 setattr(self, k, val)
         except Exception:
-            # Onchange should never raise; just log.
             _logger.exception("Onchange VIN autodecode failed for %s", v)
             return
 
     @api.model
     def create(self, vals):
         rec = super().create(vals)
+        # Optional auto-create vendor bill
+        if vals.get("create_vendor_bill_on_save"):
+            try:
+                rec._create_vendor_bill()
+            except Exception as e:
+                _logger.exception("Auto vendor bill creation failed")
+                # Don't block create – show message next time user opens record
+                rec.message_post(body=_("Vendor bill could not be created automatically: %s") % e)
+
         vin = vals.get("vin")
         if vin and len(vin.strip()) == 17:
             v = vin.strip().upper()
@@ -325,7 +400,6 @@ class VinVehicle(models.Model):
                 try:
                     result = rec._nhtsa_decode(v)
                     vals2 = rec._vals_from_nhtsa(result)
-                    # bypass our write() override to avoid recursion
                     super(VinVehicle, rec.with_context(skip_autodecode=True)).write(vals2)
                 except Exception:
                     _logger.exception("Auto-decode on create failed for %s", vin)
@@ -333,6 +407,16 @@ class VinVehicle(models.Model):
 
     def write(self, vals):
         res = super().write(vals)
+        # Create vendor bill if user just ticked the flag
+        if vals.get("create_vendor_bill_on_save"):
+            for rec in self:
+                if not rec.vendor_bill_id:
+                    try:
+                        rec._create_vendor_bill()
+                    except Exception as e:
+                        _logger.exception("Vendor bill creation failed on write")
+                        rec.message_post(body=_("Vendor bill could not be created: %s") % e)
+
         if "vin" in vals and not self.env.context.get("skip_autodecode"):
             for rec in self:
                 vin = rec.vin and rec.vin.strip()
@@ -342,8 +426,60 @@ class VinVehicle(models.Model):
                         try:
                             result = rec._nhtsa_decode(v)
                             vals2 = rec._vals_from_nhtsa(result)
-                            # bypass our own write again
                             super(VinVehicle, rec.with_context(skip_autodecode=True)).write(vals2)
                         except Exception:
                             _logger.exception("Auto-decode on write failed for %s", vin)
         return res
+
+    # --- Vendor bill creation ---
+    def _get_default_expense_account(self):
+        """Best effort: pick an expense account in the company; if none, raise."""
+        account = self.env["account.account"].search([
+            ("account_type", "=", "expense"),
+            ("company_id", "=", self.company_id.id),
+        ], limit=1)
+        if not account:
+            raise UserError(_("Please configure at least one Expense account for company %s.") % self.company_id.display_name)
+        return account
+
+    def action_create_vendor_bill(self):
+        self.ensure_one()
+        self._create_vendor_bill()
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "account.move",
+            "view_mode": "form",
+            "res_id": self.vendor_bill_id.id,
+        }
+
+    def _create_vendor_bill(self):
+        self.ensure_one()
+        if self.vendor_bill_id:
+            return  # already created
+
+        if not self.seller_partner_id:
+            raise UserError(_("Select a Seller / Counterparty to create a vendor bill."))
+
+        amount = (self.purchase_price or 0.0) + (self.auction_fees or 0.0) + (self.other_fees or 0.0)
+        if not amount:
+            raise UserError(_("No purchase amounts present (price/fees)."))
+
+        expense_account = self._get_default_expense_account()
+        move_vals = {
+            "move_type": "in_invoice",
+            "partner_id": self.seller_partner_id.id,
+            "invoice_date": self.purchase_date or fields.Date.context_today(self),
+            "currency_id": self.currency_id.id,
+            "invoice_line_ids": [
+                (0, 0, {
+                    "name": f"Vehicle {self.vin} purchase & fees",
+                    "quantity": 1.0,
+                    "price_unit": amount,
+                    "account_id": expense_account.id,
+                })
+            ],
+            "invoice_origin": self.name,
+        }
+        move = self.env["account.move"].create(move_vals)
+        self.vendor_bill_id = move.id
+        self.message_post(body=_("Vendor Bill created: %s") % (move.name or move.display_name))

@@ -1,3 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_vin_vehicle_user,access_vin_vehicle_user,model_vin_vehicle,base.group_user,1,1,1,0
-access_vin_vehicle_manager,access_vin_vehicle_manager,model_vin_vehicle,base.group_system,1,1,1,1
+access_vin_vehicle_admin,access_vin_vehicle_admin,model_vin_vehicle,base.group_system,1,1,1,1
