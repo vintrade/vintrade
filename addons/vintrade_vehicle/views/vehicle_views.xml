@@ -45,6 +45,7 @@
         <field name="purchase_date"/>
         <field name="purchase_price"/>
         <field name="total_cost"/>
+        <field name="buyer_partner_id"/>
         <field name="expected_sale_price"/>
         <field name="sale_price"/>
         <field name="repair_estimate"/>
@@ -63,20 +64,13 @@
     <field name="arch" type="xml">
       <form string="Vehicle">
         <header>
-          <button name="action_decode_vin" type="object" string="Decode VIN" class="btn-secondary"
-                  invisible="not vin"/>
-          <button name="action_mark_purchased" type="object" string="Purchased" class="btn-primary"
-                  invisible="state != 'draft'"/>
-          <button name="action_mark_enroute" type="object" string="En Route"
-                  invisible="state != 'purchased'"/>
-          <button name="action_mark_warehouse" type="object" string="At Warehouse"
-                  invisible="state != 'enroute'"/>
-          <button name="action_mark_shipped" type="object" string="Shipped"
-                  invisible="state != 'warehouse'"/>
-          <button name="action_mark_delivered" type="object" string="Delivered"
-                  invisible="state != 'shipped'"/>
-          <field name="state" widget="statusbar"
-                 statusbar_visible="draft,purchased,enroute,warehouse,shipped,delivered,cancelled"/>
+          <button name="action_decode_vin" type="object" string="Decode VIN" class="btn-secondary" invisible="not vin"/>
+          <button name="action_mark_purchased" type="object" string="Purchased" class="btn-primary" invisible="state != 'draft'"/>
+          <button name="action_mark_enroute" type="object" string="En Route" invisible="state != 'purchased'"/>
+          <button name="action_mark_warehouse" type="object" string="At Warehouse" invisible="state != 'enroute'"/>
+          <button name="action_mark_shipped" type="object" string="Shipped" invisible="state != 'warehouse'"/>
+          <button name="action_mark_delivered" type="object" string="Delivered" invisible="state != 'shipped'"/>
+          <field name="state" widget="statusbar" statusbar_visible="draft,purchased,enroute,warehouse,shipped,delivered,cancelled"/>
         </header>
 
         <sheet>
@@ -86,6 +80,9 @@
             </button>
             <button class="oe_stat_button" type="object" name="action_create_vendor_bill" icon="fa-file-text-o">
               <field name="vendor_bill_id" string="Vendor Bill" widget="statinfo"/>
+            </button>
+            <button class="oe_stat_button" type="object" name="action_create_customer_invoice" icon="fa-file-text">
+              <field name="customer_invoice_id" string="Customer Invoice" widget="statinfo"/>
             </button>
           </div>
 
@@ -145,21 +142,18 @@
 
           <group string="Commercial">
             <group>
+              <field name="buyer_partner_id" context="{'default_customer_rank': 1}"/>
               <field name="expected_sale_price"/>
               <field name="sale_price"/>
               <field name="repair_estimate"/>
               <field name="profit" readonly="1"/>
             </group>
             <group>
-              <!-- Replace invalid <label> tags with styled divs -->
-              <div class="o_form_label" invisible="not total_loss">
-                Vehicle has been declared a total loss by the insurer
-              </div>
+              <div class="o_form_label" invisible="not total_loss">Vehicle has been declared a total loss by the insurer</div>
               <field name="total_loss"/>
-              <div class="o_form_label" invisible="not warranty_cancelled">
-                The manufacturer’s warranty has been cancelled
-              </div>
+              <div class="o_form_label" invisible="not warranty_cancelled">The manufacturer’s warranty has been cancelled</div>
               <field name="warranty_cancelled"/>
+              <field name="customer_invoice_id" readonly="1"/>
             </group>
           </group>
 
