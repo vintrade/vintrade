@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <!-- Parent is defined in vintrade_vehicle, so prefix it -->
+  <!-- Parent menu comes from vintrade_vehicle -->
   <menuitem id="menu_vin_ledger_root"
             name="Ledger"
             parent="vintrade_vehicle.menu_vin_root"

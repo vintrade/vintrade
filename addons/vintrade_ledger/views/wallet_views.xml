@@ -40,5 +40,9 @@
     <field name="view_mode">tree,form</field>
   </record>
 
-  <menuitem id="menu_wallet_moves" parent="menu_vin_wallet" action="action_wallet_moves" sequence="10"/>
+  <!-- Put Wallet directly under the Ledger root -->
+  <menuitem id="menu_wallet_moves"
+            parent="menu_vin_ledger_root"
+            action="action_wallet_moves"
+            sequence="10"/>
 </odoo>
