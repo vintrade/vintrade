@@ -151,9 +151,14 @@
               <field name="profit" readonly="1"/>
             </group>
             <group>
-              <label string="Vehicle has been declared a total loss by the insurer" invisible="not total_loss"/>
+              <!-- Replace invalid <label> tags with styled divs -->
+              <div class="o_form_label" invisible="not total_loss">
+                Vehicle has been declared a total loss by the insurer
+              </div>
               <field name="total_loss"/>
-              <label string="The manufacturer’s warranty has been cancelled" invisible="not warranty_cancelled"/>
+              <div class="o_form_label" invisible="not warranty_cancelled">
+                The manufacturer’s warranty has been cancelled
+              </div>
               <field name="warranty_cancelled"/>
             </group>
           </group>
